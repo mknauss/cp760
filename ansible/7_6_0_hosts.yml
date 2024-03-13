@@ -1,0 +1,171 @@
+---
+all:
+  vars:
+    deployment_strategy: rolling
+    ansible_connection: ssh
+    ansible_user: ec2-user
+    ansible_become: true
+    zookeeper_user: kafka
+    confluent_package_version: 7.6.0
+
+    confluent_license: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiIwMDZmMTAwMDAwWjFicnJBQUIiLCJleHAiOjE2NTEyNzY4MDAsImlhdCI6MTU4NTUyNjQwMCwiaXNzIjoiQ29uZmx1ZW50IiwibW9uaXRvcmluZyI6dHJ1ZSwibmI0IjoxNTg1NTkzODE3LCJzdWIiOiJjb250cm9sLWNlbnRlciJ9.J6U9MM6eC0ZIIhWZfcPPNJiVzCiZJBNqJkrMy-yD___xcAn3M5LTkozZjfzS35s1HHeWeXCRBh_6oM2XaBpAWQ2-d5qgW_qWKm-rsjHOPQ1yz3YX_jlDHKpI0kBIKuaYXnlU_7S9t1XcflUdFQf31P4oUzUbYWE97cQ4u34QNpwZO1vHd3452OwLKKszejizvnQTMu_PHgAtoTrJBB1o0_dZnEGWmzVEgo5Oi3tKtkOvYddW58eW0xGgLWqbDZfRnImfhrCNZdk0XQu7WtXsc4A665CmuNnkZ0__P2_AqsU0_QnCNJBJc4xmahFm_kw1yhBRnLilKLWrhnhTVKjYtA%
+    ##Installation information
+    installation_method: archive
+    confluent_archive_file_source: /data/dev/archive/confluent-7.6.0.tar.gz
+    confluent_archive_file_remote: false
+    archive_destination_path: /app/confluent
+    custom_java_path: /usr/lib/jvm/java-17-amazon-corretto.x86_64
+
+    zookeeper_custom_properties:
+      4lw.commands.whitelist: stat,ruok,conf,isro,mntr
+      initLimit: 6
+      syncLimit: 3
+      dataDir: /kafka/data/zookeeper
+    zookeeper_service_environment_overrides:
+      KAFKA_LOG4J_OPTS: "-Dlog4j.configuration=file:/app/confluent/confluent-7.6.0/etc/kafka/zookeeper-log4j.properties"
+      
+    control_center_custom_properties:
+      properties:
+      confluent.license: "{{ confluent_license }}"
+      control.center.custom.log4j: true
+      control.center.log4j.root.logger: INFO, main
+      confluent.controlcenter.disk.skew.warning.min.bytes: 5368709120
+      confluent.controlcenter.id: 1026
+      confluent.controlcenter.data.dir: /data/confluent/control-center
+      confluent.controlcenter.usage.data.collection.enable: false
+      confluent.controlcenter.connect.connect-cluster.cluster: http://kafka3:8083
+
+    schema_registry_custom_properties:
+      properties:
+      confluent.license: "{{ confluent_license }}"
+    kafka_connect_custom_properties:
+      properties:
+      confluent.license: "{{ confluent_license }}"
+      kafka_connect_user: cp-kafka
+    kafka_rest_custom_properties:
+      properties:
+      confluent.license: "{{ confluent_license }}"
+      kafka_rest_user: cp-kafka
+    ksql_custom_properties:
+      properties:
+      confluent.license: "{{ confluent_license }}"
+
+    kafka_broker_custom_properties:
+      kafka_broker_user: cp-kafka
+      appender_log_path: /var/log/kafka
+      num.io.threads: 6
+      confluent.license: "{{ confluent_license }}"
+      allow.everyone.if.no.acl.found: true
+      log.dirs: /kafka/data/7_6_0
+    kafka_broker_service_environment_overrides:
+      KAFKA_LOG4J_OPTS: "-Dlog4j.configuration=file:/app/confluent/confluent-7.6.0/etc/kafka/log4j.properties"
+
+    sasl_protocol: plain
+    ssl_enabled: false
+    ssl_mutual_auth_enabled: false
+    zookeeper_ssl_enabled: false
+    zookeeper_ssl_mutual_auth_enabled: false
+
+    regenerate_ca: false
+    regenerate_keystore_and_truststore: false
+
+    kafka_broker_custom_listeners:
+      broker:
+        name: BROKER
+        port: 9091
+        ssl_enabled: false
+        ssl_mutual_auth_enabled: false
+        sasl_protocol: PLAIN
+      internal:
+        name: INTERNAL
+        port: 9092
+        ssl_enabled: false
+        ssl_mutual_auth_enabled: false
+        sasl_protocol: PLAIN
+    ## You can even add additional listeners, make sure name and port are unique
+      client_listener:
+        name: CLIENT
+        port: 9093
+        ssl_enabled: false
+        ssl_mutual_auth_enabled: false
+        sasl_protocol: PLAIN
+ 
+zookeeper:
+  hosts:
+    zoo1:
+      ## By default the first host will get zookeeper id=1, second gets id=2. Set zookeeper_id to customize
+      zookeeper_id: 1
+    zoo2:
+      zookeeper_id: 2
+    zoo3:
+      zookeeper_id: 3
+
+kafka_broker:
+  vars:
+    kafka_broker:
+    kafka_broker_custom_properties:
+      confluent.balancer.enable: "true"
+  
+  hosts:
+    kafka1:
+      broker_id: 1
+      kafka_broker_custom_properties:
+        broker.rack: us-east-2a
+        replica.selector.class: org.apache.kafka.common.replica.RackAwareReplicaSelector
+      kafka_broker_service_environment_overrides: #you'll need these if using a t2.medium on AWS EC2
+        KAFKA_HEAP_OPTS: "-Xms3G -Xmx3g"
+    kafka2:
+      broker_id: 2
+      kafka_broker_custom_properties:
+        broker.rack: us-east-2b
+        replica.selector.class: org.apache.kafka.common.replica.RackAwareReplicaSelector
+      kafka_broker_service_environment_overrides: #you'll need these if using a t2.medium on AWS EC2
+        KAFKA_HEAP_OPTS: "-Xms3G -Xmx3g"
+    kafka3:
+      broker_id: 3
+      kafka_broker_custom_properties:
+        broker.rack: us-east-2c
+        replica.selector.class: org.apache.kafka.common.replica.RackAwareReplicaSelector
+        kafka_broker_service_environment_overrides: #you'll need these if using a t2.medium on AWS EC2
+        KAFKA_HEAP_OPTS: "-Xms6G -Xmx6g"
+    kafka4:
+      broker_id: 4
+      kafka_broker_custom_properties:
+        broker.rack: us-east-2c
+        replica.selector.class: org.apache.kafka.common.replica.RackAwareReplicaSelector
+        kafka_broker_service_environment_overrides: #you'll need these if using a t2.medium on AWS EC2
+        KAFKA_HEAP_OPTS: "-Xms3G -Xmx3g"
+    kafka5:
+      broker_id: 5
+      kafka_broker_custom_properties:
+        broker.rack: us-east-2c
+        replica.selector.class: org.apache.kafka.common.replica.RackAwareReplicaSelector
+        kafka_broker_service_environment_overrides: #you'll need these if using a t2.medium on AWS EC2
+        KAFKA_HEAP_OPTS: "-Xms3G -Xmx3g"
+
+schema_registry:
+  hosts:
+    broker1:
+
+kafka_rest:
+  hosts:
+    broker2:
+
+ksql:
+  hosts:
+    connect:
+
+kafka_connect:
+  vars:
+    kafka_connect_plugins_path:
+      - /app/confluent/etc/connect
+    kafka_connect_confluent_hub_plugins:
+      - jcustenborder/kafka-connect-spooldir:2.0.43
+  hosts:
+    connect:
+
+control_center:
+  vars:
+    control_center_user: kafka
+  hosts:
+    c3:
